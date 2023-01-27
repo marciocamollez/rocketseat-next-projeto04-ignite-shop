@@ -8,47 +8,44 @@ import { GetStaticPaths, GetStaticProps } from "next";
 import Stripe from "stripe";
 import Image from "next/image";
 import { useRouter } from "next/router";
-import axios from "axios";
-import { useState } from "react";
 import Head from "next/head";
+import { useCart } from "@/hooks/useCart";
+import { IProduct } from "@/contexts/CartContext";
 
 interface ProductProps {
-  product: {
-    id: string;
-    name: string;
-    imageUrl: string;
-    price: string;
-    description: string;
-    defaultPriceId: string;
-  };
+  product: IProduct[];
 }
 
 export default function Product({ product }: ProductProps) {
-  const [isCreatingCheckoutSession, setTsCreatingCheckoutSession] =
-    useState(false);
+  // const [isCreatingCheckoutSession, setTsCreatingCheckoutSession] =
+  //   useState(false);
 
   const { isFallback } = useRouter();
+
+  const { checkIfItemAlreadyExists, addToCart } = useCart();
 
   if (isFallback) {
     return <p>loading...</p>;
   }
 
-  async function handleBuyProduct() {
-    // console.log(product.defaultPriceId);
-    try {
-      setTsCreatingCheckoutSession(true);
-      const response = await axios.post("/api/checkout", {
-        priceId: product.defaultPriceId,
-      });
-      const { checkoutUrl } = response.data;
+  const itemAlreadyInCart = checkIfItemAlreadyExists(product.id);
 
-      // Aplicacao externa usar window location. Para interna, usar useRouter para redirecionar
-      window.location.href = checkoutUrl;
-    } catch (err) {
-      setTsCreatingCheckoutSession(false);
-      alert("Falha no checkout");
-    }
-  }
+  // async function handleBuyProduct() {
+  //   // console.log(product.defaultPriceId);
+  //   try {
+  //     setTsCreatingCheckoutSession(true);
+  //     const response = await axios.post("/api/checkout", {
+  //       priceId: product.defaultPriceId,
+  //     });
+  //     const { checkoutUrl } = response.data;
+
+  //     // Aplicacao externa usar window location. Para interna, usar useRouter para redirecionar
+  //     window.location.href = checkoutUrl;
+  //   } catch (err) {
+  //     setTsCreatingCheckoutSession(false);
+  //     alert("Falha no checkout");
+  //   }
+  // }
 
   return (
     <>
@@ -64,10 +61,12 @@ export default function Product({ product }: ProductProps) {
           <span>{product.price}</span>
           <p>{product.description}</p>
           <button
-            disabled={isCreatingCheckoutSession}
-            onClick={handleBuyProduct}
+            disabled={itemAlreadyInCart}
+            onClick={() => addToCart(product)}
           >
-            Comprar agora
+            {itemAlreadyInCart
+              ? "Produto já está no carrinho"
+              : "Colocar na sacola"}
           </button>
         </ProductDetails>
       </ProductContainer>
@@ -105,6 +104,7 @@ export const getStaticProps: GetStaticProps<any, { id: string }> = async ({
         }).format(price.unit_amount / 100),
         description: product.description,
         defaultPriceId: price.id,
+        numberPrice: price.unit_amount / 100,
       },
     },
     revalidate: 60 * 60 * 1, // 1hora
